@@ -1,0 +1,435 @@
+
+import pygame
+import math
+import sys
+
+# ==========================================
+# INICIALIZACAO
+# ==========================================
+
+pygame.init()
+
+LARGURA = 700
+ALTURA = 700
+
+tela = pygame.display.set_mode((LARGURA, ALTURA))
+
+pygame.display.set_caption("OTP Animation - Python")
+
+relogio = pygame.time.Clock()
+
+# ==========================================
+# CORES
+# ==========================================
+
+PRETO = (8, 8, 12)
+BRANCO = (245, 245, 245)
+CINZA = (85, 88, 100)
+CINZA_ESCURO = (30, 32, 43)
+LARANJA = (255, 170, 20)
+VERDE = (30, 220, 120)
+VERMELHO = (240, 65, 65)
+
+# ==========================================
+# FONTES
+# ==========================================
+
+fonte_titulo = pygame.font.SysFont("arial", 28, bold=True)
+fonte_numero = pygame.font.SysFont("arial", 20, bold=True)
+fonte_centro = pygame.font.SysFont("arial", 48, bold=True)
+fonte_texto = pygame.font.SysFont("arial", 20)
+
+# ==========================================
+# CONFIGURACAO DO MOSTRADOR
+# ==========================================
+
+CENTRO_X = LARGURA // 2
+CENTRO_Y = 330
+
+RAIO = 125
+
+# Senha correta para o exemplo
+SENHA_CORRETA = "4729"
+
+# Senha digitada
+codigo = ""
+
+# Posicao inicial do ponteiro
+angulo_atual = -90
+
+# Angulo desejado
+angulo_alvo = -90
+
+# Estado do sistema
+desbloqueado = False
+erro = False
+
+# ==========================================
+# POSICAO DOS NUMEROS
+# ==========================================
+
+def calcular_posicao(numero):
+
+    # Organiza os numeros ao redor do mostrador
+    indice = (numero - 4) % 10
+
+    angulo = -90 + indice * 36
+
+    radianos = math.radians(angulo)
+
+    x = CENTRO_X + math.cos(radianos) * RAIO
+    y = CENTRO_Y + math.sin(radianos) * RAIO
+
+    return x, y
+
+
+# ==========================================
+# DESENHAR MOSTRADOR
+# ==========================================
+
+def desenhar_mostrador():
+
+    # Circulo externo
+    pygame.draw.circle(
+        tela,
+        CINZA_ESCURO,
+        (CENTRO_X, CENTRO_Y),
+        155
+    )
+
+    # Circulo interno
+    pygame.draw.circle(
+        tela,
+        (22, 24, 35),
+        (CENTRO_X, CENTRO_Y),
+        145
+    )
+
+    # Graduacoes do mostrador
+    for i in range(60):
+
+        angulo = math.radians(i * 6 - 90)
+
+        if i % 6 == 0:
+            comprimento = 15
+            cor = BRANCO
+        else:
+            comprimento = 7
+            cor = CINZA
+
+        x1 = CENTRO_X + math.cos(angulo) * 132
+        y1 = CENTRO_Y + math.sin(angulo) * 132
+
+        x2 = CENTRO_X + math.cos(angulo) * (132 - comprimento)
+        y2 = CENTRO_Y + math.sin(angulo) * (132 - comprimento)
+
+        pygame.draw.line(
+            tela,
+            cor,
+            (x1, y1),
+            (x2, y2),
+            2
+        )
+
+    # Numeros de 0 a 9
+    for numero in range(10):
+
+        x, y = calcular_posicao(numero)
+
+        cor = LARANJA if numero == 4 else BRANCO
+
+        texto = fonte_numero.render(
+            str(numero),
+            True,
+            cor
+        )
+
+        retangulo = texto.get_rect(center=(x, y))
+
+        tela.blit(texto, retangulo)
+
+
+# ==========================================
+# DESENHAR PONTEIRO
+# ==========================================
+
+def desenhar_ponteiro():
+
+    radianos = math.radians(angulo_atual)
+
+    # Ponta do ponteiro
+    x = CENTRO_X + math.cos(radianos) * 115
+    y = CENTRO_Y + math.sin(radianos) * 115
+
+    # Linha do ponteiro
+    cor = VERDE if desbloqueado else LARANJA
+
+    pygame.draw.line(
+        tela,
+        cor,
+        (CENTRO_X, CENTRO_Y),
+        (x, y),
+        5
+    )
+
+    # Circulo central
+    pygame.draw.circle(
+        tela,
+        cor,
+        (CENTRO_X, CENTRO_Y),
+        12
+    )
+
+
+# ==========================================
+# DESENHAR PAINEL CENTRAL
+# ==========================================
+
+def desenhar_centro():
+
+    pygame.draw.circle(
+        tela,
+        PRETO,
+        (CENTRO_X, CENTRO_Y),
+        43
+    )
+
+    # Exibe a quantidade de digitos
+    if desbloqueado:
+
+        valor = "OK"
+
+    else:
+
+        valor = str(len(codigo))
+
+    texto = fonte_centro.render(
+        valor,
+        True,
+        VERDE if desbloqueado else BRANCO
+    )
+
+    retangulo = texto.get_rect(
+        center=(CENTRO_X, CENTRO_Y)
+    )
+
+    tela.blit(texto, retangulo)
+
+
+# ==========================================
+# ANIMACAO DO PONTEIRO
+# ==========================================
+
+def atualizar_ponteiro():
+
+    global angulo_atual
+
+    diferenca = (angulo_alvo - angulo_atual + 180) % 360 - 180
+
+    angulo_atual += diferenca * 0.12
+
+    # Evita movimentos muito pequenos infinitamente
+    if abs(diferenca) < 0.2:
+        angulo_atual = angulo_alvo
+
+
+# ==========================================
+# RECEBER NUMEROS
+# ==========================================
+
+def receber_numero(numero):
+
+    global codigo
+    global angulo_alvo
+    global erro
+    global desbloqueado
+
+    if desbloqueado:
+        return
+
+    if len(codigo) >= 4:
+        return
+
+    # Acrescenta o numero digitado
+    codigo += str(numero)
+
+    # Calcula o angulo do ponteiro
+    indice = (numero - 4) % 10
+
+    angulo_alvo = -90 + indice * 36
+
+    erro = False
+
+
+# ==========================================
+# VERIFICAR SENHA
+# ==========================================
+
+def verificar_senha():
+
+    global desbloqueado
+    global erro
+
+    if codigo == SENHA_CORRETA:
+
+        desbloqueado = True
+        erro = False
+
+    else:
+
+        erro = True
+
+
+# ==========================================
+# DESENHAR INTERFACE
+# ==========================================
+
+def desenhar_interface():
+
+    tela.fill(PRETO)
+
+    # Titulo
+    titulo = fonte_titulo.render(
+        "OTP ANIMATION",
+        True,
+        BRANCO
+    )
+
+    tela.blit(
+        titulo,
+        titulo.get_rect(center=(CENTRO_X, 65))
+    )
+
+    desenhar_mostrador()
+
+    desenhar_ponteiro()
+
+    desenhar_centro()
+
+    # Indicador de digitos
+    senha_visual = " ".join(
+        "*" if i < len(codigo) else "_"
+        for i in range(4)
+    )
+
+    texto_codigo = fonte_titulo.render(
+        senha_visual,
+        True,
+        LARANJA
+    )
+
+    tela.blit(
+        texto_codigo,
+        texto_codigo.get_rect(center=(CENTRO_X, 535))
+    )
+
+    # Mensagens
+    if desbloqueado:
+
+        mensagem = "ACESSO LIBERADO!"
+
+        cor = VERDE
+
+    elif erro:
+
+        mensagem = "SENHA INCORRETA!"
+
+        cor = VERMELHO
+
+    else:
+
+        mensagem = "DIGITE SUA SENHA"
+
+        cor = BRANCO
+
+    texto = fonte_texto.render(
+        mensagem,
+        True,
+        cor
+    )
+
+    tela.blit(
+        texto,
+        texto.get_rect(center=(CENTRO_X, 590))
+    )
+
+    # Instrucao
+    instrucao = fonte_texto.render(
+        "DIGITE 4 NUMEROS - BACKSPACE APAGA - R REINICIA",
+        True,
+        CINZA
+    )
+
+    tela.blit(
+        instrucao,
+        instrucao.get_rect(center=(CENTRO_X, 650))
+    )
+
+
+# ==========================================
+# LOOP PRINCIPAL
+# ==========================================
+
+rodando = True
+
+while rodando:
+
+    # Captura eventos do teclado
+    for evento in pygame.event.get():
+
+        if evento.type == pygame.QUIT:
+
+            rodando = False
+
+        if evento.type == pygame.KEYDOWN:
+
+            # Encerrar programa
+            if evento.key == pygame.K_ESCAPE:
+
+                rodando = False
+
+            # Reiniciar sistema
+            elif evento.key == pygame.K_r:
+
+                codigo = ""
+                desbloqueado = False
+                erro = False
+
+                angulo_atual = -90
+                angulo_alvo = -90
+
+            # Apagar ultimo digito
+            elif evento.key == pygame.K_BACKSPACE:
+
+                if not desbloqueado:
+                    codigo = ""
+                    erro = False
+
+            # Receber numero
+            elif evento.unicode.isdigit():
+
+                receber_numero(int(evento.unicode))
+
+    # Atualiza animacao
+    atualizar_ponteiro()
+
+    # Verifica se foram digitados 4 numeros
+    if len(codigo) == 4 and not desbloqueado and not erro:
+
+        if angulo_atual == angulo_alvo:
+
+            verificar_senha()
+
+    # Desenha a interface
+    desenhar_interface()
+
+    pygame.display.flip()
+
+    # Limita a animacao a 60 quadros por segundo
+    relogio.tick(60)
+
+
+# Finaliza o Pygame
+pygame.quit()
+
+sys.exit()
